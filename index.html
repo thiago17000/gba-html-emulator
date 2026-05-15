@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GBA Emulator - Pokémon Fire Red</title>
     <style>
+        * {
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
         body {
             background-color: #1a1a1a;
             color: #fff;
@@ -13,29 +19,145 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 10px;
         }
         h1 { margin-bottom: 10px; font-size: 1.5rem; }
+
+        /* Container do Emulador */
         #emulator-container {
-            box-shadow: 0px 10px 30px rgba(0,0,0,0.5);
+            background: #000;
             border-radius: 4px;
             overflow: hidden;
-            background: #000;
+            box-shadow: 0px 10px 30px rgba(0,0,0,0.5);
         }
         canvas {
             display: block;
-            image-rendering: pixelated; /* Keeps pixels sharp */
+            image-rendering: pixelated;
         }
-        .controls {
+
+        /* Texto de controles para PC */
+        .pc-controls {
             margin-top: 15px;
             font-size: 0.9rem;
             color: #aaa;
             text-align: center;
             line-height: 1.4;
+            display: block; /* Visível por padrão no PC */
+        }
+
+        /* Painel do Controle Virtual (Mobile) */
+        #virtual-controller {
+            width: 100%;
+            max-width: 480px;
+            margin-top: 15px;
+            display: none; /* ESCONDIDO POR PADRÃO NO PC */
+            flex-direction: column;
+            gap: 15px;
+        }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        .dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 45px);
+            grid-template-rows: repeat(3, 45px);
+            width: 135px;
+            height: 135px;
+        }
+        .dbtn {
+            background: #333;
+            border: 2px solid #555;
+            color: #fff;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+        .dbtn:active { background: #555; }
+        .center-space { background: transparent; border: none; }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            transform: translateY(-10px);
+        }
+        .abtn {
+            width: 55px;
+            height: 55px;
+            background: #a31d1d;
+            border: 3px solid #cb2c2c;
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px #611010;
+        }
+        .abtn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #611010;
+        }
+        .system-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            width: 100%;
+        }
+        .sbtn {
+            width: 70px;
+            height: 25px;
+            background: #555;
+            border: 1px solid #777;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .sbtn:active { background: #777; }
+
+        /* ==========================================================
+           REGRAS EXCLUSIVAS PARA CELULARES (Telas menores que 768px)
+           ========================================================== */
+        @media (max-width: 767px) {
+            body {
+                justify-content: flex-start;
+                background-color: #111;
+            }
+            h1 { font-size: 1.2rem; margin: 5px 0; }
+            
+            /* Ajusta a tela do jogo para ocupar a largura do celular */
+            #emulator-container {
+                width: 100%;
+                max-width: 480px;
+            }
+            canvas {
+                width: 100%;
+                height: auto;
+            }
+
+            /* Esconde as instruções de teclado do PC */
+            .pc-controls {
+                display: none;
+            }
+
+            /* ATIVA O CONTROLE VIRTUAL DO CELULAR */
+            #virtual-controller {
+                display: flex;
+            }
         }
     </style>
-    <!-- Import the GBA.js emulator engine engine via public CDN -->
     <script src="https://jsdelivr.net"></script>
 </head>
 <body>
@@ -43,40 +165,93 @@
     <h1>Pokémon Fire Red</h1>
     
     <div id="emulator-container">
-        <!-- GBA native resolution is 240x160. Scale up for visibility -->
+        <!-- Resolução nativa tratada via CSS dependendo do dispositivo -->
         <canvas id="screen" width="480" height="320"></canvas>
     </div>
 
-    <div class="controls">
+    <!-- CÓDIGO DO PC: Aparece apenas em telas grandes -->
+    <div class="pc-controls">
         <strong>Controls:</strong> <br>
         D-Pad: Arrow Keys | A: Z | B: X | L: A | R: S <br>
         Start: Enter | Select: Shift
+    </div>
+
+    <!-- CÓDIGO DO CELULAR: Aparece apenas em telas pequenas -->
+    <div id="virtual-controller">
+        <div class="row">
+            <div class="dpad">
+                <div class="center-space"></div>
+                <div class="dbtn" id="btn-up">▲</div>
+                <div class="center-space"></div>
+                <div class="dbtn" id="btn-left">◀</div>
+                <div class="center-space"></div>
+                <div class="dbtn" id="btn-right">▶</div>
+                <div class="center-space"></div>
+                <div class="dbtn" id="btn-down">▼</div>
+                <div class="center-space"></div>
+            </div>
+            <div class="action-buttons">
+                <div class="abtn" id="btn-b">B</div>
+                <div class="abtn" id="btn-a">A</div>
+            </div>
+        </div>
+        <div class="system-buttons">
+            <div class="sbtn" id="btn-select">Select</div>
+            <div class="sbtn" id="btn-start">Start</div>
+        </div>
     </div>
 
     <script>
         window.onload = function() {
             var gba;
             try {
-                // Initialize engine bound to our canvas
                 gba = new GameBoyAdvance();
                 gba.setCanvas(document.getElementById('screen'));
                 gba.logLevel = gba.LOG_ERROR;
 
-                // Load the ROM file asynchronously from the repository root
-                gba.loadRomFromFile('Pokemon - FireRed Version (USA).gba', function(err) {
+                gba.loadRomFromFile('firered.gba', function(err) {
                     if (err) {
-                        console.error("Failed to load ROM:", err);
                         alert("Could not load game file.");
                     } else {
-                        // Start emulation loop once file is ready
                         gba.run();
+                        // Ativa os cliques na tela caso o usuário esteja no celular
+                        setupMobileControls(gba);
                     }
                 });
             } catch (exception) {
-                console.error("Emulator crashed during boot:", exception);
+                console.error(exception);
             }
         };
-    </script>
 
+        function setupMobileControls(gbaInstance) {
+            const KEY = gbaInstance.keypad;
+            const buttonMap = {
+                'btn-up': KEY.UP,
+                'btn-down': KEY.DOWN,
+                'btn-left': KEY.LEFT,
+                'btn-right': KEY.RIGHT,
+                'btn-a': KEY.A,
+                'btn-b': KEY.B,
+                'btn-start': KEY.START,
+                'btn-select': KEY.SELECT
+            };
+
+            Object.keys(buttonMap).forEach(id => {
+                const element = document.getElementById(id);
+                const gbaKey = buttonMap[id];
+
+                if (element) {
+                    element.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        gbaInstance.keypad.keydown(gbaKey);
+                    });
+                    element.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        gbaInstance.keypad.keyup(gbaKey);
+                    });
+                }
+            });
+        }
+    </script>
 </body>
 </html>
